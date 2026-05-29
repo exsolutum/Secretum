@@ -8,11 +8,14 @@ import { AdminPanel } from './AdminPanel';
 import { FileUpload } from './FileUpload';
 import { NotificationSystem, useNotifications } from './Notifications';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
+import { ConnectionStatus } from './ConnectionStatus';
+import { SettingsPanel } from './SettingsPanel';
 
 export const ChatRoom: React.FC = () => {
   const chat = useChat();
   const [replyTo, setReplyTo] = useState<{ messageId: string; nickname: string } | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const { notifications, addNotification, dismissNotification } = useNotifications();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
@@ -132,6 +135,12 @@ export const ChatRoom: React.FC = () => {
             height: '16px',
             background: 'var(--accent-cyan-border)',
           }} />
+          <ConnectionStatus state={chat.connectionState} />
+          <div style={{
+            width: '1px',
+            height: '16px',
+            background: 'var(--accent-cyan-border)',
+          }} />
           <span style={{
             color: 'var(--text-primary)',
             fontFamily: 'var(--font-mono)',
@@ -158,6 +167,13 @@ export const ChatRoom: React.FC = () => {
             onAdminCommand={handleAdminCommand}
           />
           <button
+            className="btn btn-sm"
+            onClick={() => setShowSettings(true)}
+            style={{ fontSize: '10px', padding: '4px 10px' }}
+          >
+            ⚙ SETTINGS
+          </button>
+          <button
             className="btn btn-sm btn-danger"
             onClick={chat.disconnect}
             style={{ fontSize: '10px', padding: '4px 10px' }}
@@ -166,6 +182,8 @@ export const ChatRoom: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Messages */}
       <MessageList
