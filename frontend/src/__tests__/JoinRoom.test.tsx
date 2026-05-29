@@ -8,14 +8,14 @@ describe('JoinRoom', () => {
     expect(screen.getByText('SECRETUM')).toBeDefined();
   });
 
-  it('renders input fields', () => {
+  it('renders input fields with Chinese labels', () => {
     render(<JoinRoom onJoin={() => {}} connectionState="disconnected" error={null} />);
-    expect(screen.getByPlaceholderText('Your nickname')).toBeDefined();
-    expect(screen.getByPlaceholderText('Room identifier')).toBeDefined();
+    expect(screen.getByPlaceholderText('输入你的昵称')).toBeDefined();
+    expect(screen.getByPlaceholderText('输入或创建房间号')).toBeDefined();
   });
 
   it('shows error when provided', () => {
-    render(<JoinRoom onJoin={() => {}} connectionState="disconnected" error="Test error" />);
-    expect(screen.getByText('Test error')).toBeDefined();
+    render(<JoinRoom onJoin={() => {}} connectionState="disconnected" error="测试错误" />);
+    expect(screen.getByText('测试错误')).toBeDefined();
   });
 });

@@ -31,32 +31,32 @@ export const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin, connectionState, err
     }}>
       <div className="panel" style={{
         padding: '48px 40px',
-        maxWidth: '420px',
+        maxWidth: '440px',
         width: '100%',
         textAlign: 'center',
       }}>
         {/* Logo */}
-        <div style={{ marginBottom: '8px' }}>
+        <div style={{ marginBottom: '12px' }}>
           <h1 style={{
             color: 'var(--accent-cyan)',
-            fontSize: '2.4rem',
+            fontSize: '2.6rem',
             fontWeight: 700,
-            letterSpacing: '12px',
+            letterSpacing: '14px',
             textTransform: 'uppercase',
             fontFamily: 'var(--font-mono)',
             margin: 0,
           }}>
             SECRETUM
           </h1>
-          <div style={{
-            fontSize: '10px',
+          <p style={{
             color: 'var(--text-secondary)',
+            fontSize: '11px',
             fontFamily: 'var(--font-mono)',
             letterSpacing: '4px',
-            marginTop: '4px',
+            marginTop: '8px',
           }}>
-            ENCRYPTED CHAT PROTOCOL
-          </div>
+            ENCRYPTED CHAT
+          </p>
         </div>
 
         {/* Decorative line */}
@@ -74,65 +74,69 @@ export const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin, connectionState, err
         }}>
           <div style={{ textAlign: 'left' }}>
             <label style={{
-              fontSize: '10px',
+              display: 'block',
+              color: 'var(--text-secondary)',
+              fontSize: '11px',
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-cyan)',
-              letterSpacing: '2px',
+              letterSpacing: '1px',
+              marginBottom: '6px',
               textTransform: 'uppercase',
             }}>
-              CALLSIGN
+              昵称
             </label>
             <input
               className="input"
               type="text"
               value={nickname}
               onChange={e => setNickname(e.target.value)}
-              placeholder="Your nickname"
+              placeholder="输入你的昵称"
               autoFocus
-              maxLength={20}
-              style={{ marginTop: '4px' }}
+              style={{ fontSize: '15px' }}
             />
           </div>
 
           <div style={{ textAlign: 'left' }}>
             <label style={{
-              fontSize: '10px',
+              display: 'block',
+              color: 'var(--text-secondary)',
+              fontSize: '11px',
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-cyan)',
-              letterSpacing: '2px',
+              letterSpacing: '1px',
+              marginBottom: '6px',
               textTransform: 'uppercase',
             }}>
-              ROOM ID
+              房间号
             </label>
             <input
               className="input"
               type="text"
               value={roomId}
               onChange={e => setRoomId(e.target.value)}
-              placeholder="Room identifier"
-              maxLength={64}
-              style={{ marginTop: '4px' }}
+              placeholder="输入或创建房间号"
+              style={{ fontSize: '15px' }}
             />
           </div>
 
           <div style={{ textAlign: 'left' }}>
             <label style={{
-              fontSize: '10px',
+              display: 'block',
+              color: 'var(--text-secondary)',
+              fontSize: '11px',
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-cyan)',
-              letterSpacing: '2px',
+              letterSpacing: '1px',
+              marginBottom: '6px',
               textTransform: 'uppercase',
             }}>
-              ROOM SECRET
+              房间密钥
             </label>
-            <div style={{ position: 'relative', marginTop: '4px' }}>
+            <div style={{ position: 'relative' }}>
               <input
                 className="input"
                 type={showSecret ? 'text' : 'password'}
                 value={roomSecret}
                 onChange={e => setRoomSecret(e.target.value)}
-                placeholder="Encryption passphrase"
-                style={{ paddingRight: '60px' }}
+                placeholder="输入房间密钥"
+                style={{ fontSize: '15px', paddingRight: '60px' }}
               />
               <button
                 type="button"
@@ -146,11 +150,12 @@ export const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin, connectionState, err
                   border: 'none',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontSize: '10px',
+                  fontSize: '11px',
                   fontFamily: 'var(--font-mono)',
+                  padding: '4px 6px',
                 }}
               >
-                {showSecret ? 'HIDE' : 'SHOW'}
+                {showSecret ? '隐藏' : '显示'}
               </button>
             </div>
           </div>
@@ -158,12 +163,12 @@ export const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin, connectionState, err
           {error && (
             <div style={{
               color: 'var(--danger)',
-              fontSize: '12px',
-              fontFamily: 'var(--font-mono)',
-              padding: '8px 12px',
-              background: 'rgba(255, 71, 87, 0.1)',
-              border: '1px solid rgba(255, 71, 87, 0.3)',
-              borderRadius: 'var(--radius)',
+              fontSize: '13px',
+              padding: '10px 14px',
+              background: 'rgba(255, 71, 87, 0.08)',
+              border: '1px solid rgba(255, 71, 87, 0.25)',
+              borderRadius: 'var(--radius-sm)',
+              textAlign: 'left',
             }}>
               {error}
             </div>
@@ -173,27 +178,27 @@ export const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin, connectionState, err
             className="btn"
             type="submit"
             disabled={isConnecting || !nickname.trim() || !roomId.trim() || !roomSecret.trim()}
-            style={{ marginTop: '8px', width: '100%' }}
+            style={{ marginTop: '8px', width: '100%', padding: '12px' }}
           >
             {isConnecting ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                 <span className="spinner" style={{ width: '16px', height: '16px' }} />
-                CONNECTING
+                连接中...
               </span>
-            ) : 'ENTER ROOM'}
+            ) : '进入房间'}
           </button>
         </form>
 
         <div style={{
           marginTop: '32px',
-          color: 'var(--text-secondary)',
+          color: 'var(--text-dim)',
           fontSize: '10px',
           fontFamily: 'var(--font-mono)',
           letterSpacing: '1px',
-          lineHeight: '1.8',
+          lineHeight: '2',
         }}>
-          SM4 + Ed25519 ENCRYPTED<br />
-          ZERO KNOWLEDGE / SELF HOSTED
+          SM4 + Ed25519 端到端加密<br />
+          零知识 · 自托管
         </div>
       </div>
     </div>

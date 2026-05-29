@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DisplayMessage } from '../types/messages';
 import { Avatar } from './Avatar';
-import { playMessageSound, isSoundEnabled } from '../hooks/useSounds';
 
 interface MessageListProps {
   messages: DisplayMessage[];
@@ -21,11 +20,18 @@ function formatTime(ts: number): string {
 function formatDate(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === today.toDateString()) return '今天';
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString();
+  if (d.toDateString() === yesterday.toDateString()) return '昨天';
+  return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+}
+
+function shouldShowDateSeparator(msg: DisplayMessage, prev?: DisplayMessage): boolean {
+  if (!prev) return true;
+  const day1 = new Date(msg.timestamp).toDateString();
+  const day2 = new Date(prev.timestamp).toDateString();
+  return day1 !== day2;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -40,15 +46,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const prevMsgCountRef = useRef(0);
 
-  // Auto-scroll to bottom on new messages + play sound
+  // Auto-scroll
   useEffect(() => {
     if (listRef.current && messages.length > prevMsgCountRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
-      // Play sound for new messages from others
-      const latestMsg = messages[messages.length - 1];
-      if (latestMsg && !latestMsg.is_self && isSoundEnabled()) {
-        playMessageSound();
-      }
     }
     prevMsgCountRef.current = messages.length;
   }, [messages.length]);
@@ -66,35 +67,35 @@ export const MessageList: React.FC<MessageListProps> = ({
       },
       { threshold: 0.5 }
     );
-
     const msgElements = listRef.current?.querySelectorAll('[data-msg-id]');
     msgElements?.forEach(el => observer.observe(el));
-
     return () => observer.disconnect();
   }, [messages, onRead]);
 
-  // Group messages by date
-  let lastDate = '';
-
   return (
-    <div ref={listRef} style={{
-      flex: 1,
-      overflowY: 'auto',
-      padding: '16px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '2px',
-    }}>
-      {messages.map((msg) => {
-        const msgDate = formatDate(msg.timestamp);
-        const showDate = msgDate !== lastDate;
-        lastDate = msgDate;
-
-        const isSystem = msg.message_type === 'System';
+    <div
+      ref={listRef}
+      style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: 'var(--space-md)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+      }}
+    >
+      {messages.map((msg, i) => {
+        const prev = i > 0 ? messages[i - 1] : undefined;
         const isSelf = msg.is_self;
+        const isSystem = msg.message_type === 'System';
+        const showDate = shouldShowDateSeparator(msg, prev);
+        const isGrouped = prev && !isSystem && !prev.message_type.includes('System')
+          && prev.sender_uid === msg.sender_uid
+          && msg.timestamp - prev.timestamp < 60000;
 
         return (
           <React.Fragment key={msg.id}>
+            {/* Date separator */}
             {showDate && (
               <div style={{
                 display: 'flex',
@@ -102,108 +103,114 @@ export const MessageList: React.FC<MessageListProps> = ({
                 gap: '12px',
                 margin: '16px 0 8px',
               }}>
-                <div style={{
-                  flex: 1,
-                  height: '1px',
-                  background: 'var(--accent-cyan-border)',
-                }} />
+                <div style={{ flex: 1, height: '1px', background: 'rgba(0, 240, 255, 0.1)' }} />
                 <span style={{
-                  fontSize: '10px',
+                  color: 'var(--text-dim)',
+                  fontSize: '11px',
                   fontFamily: 'var(--font-mono)',
-                  color: 'var(--text-secondary)',
-                  letterSpacing: '2px',
+                  letterSpacing: '1px',
                 }}>
-                  {msgDate.toUpperCase()}
+                  {formatDate(msg.timestamp)}
                 </span>
-                <div style={{
-                  flex: 1,
-                  height: '1px',
-                  background: 'var(--accent-cyan-border)',
-                }} />
+                <div style={{ flex: 1, height: '1px', background: 'rgba(0, 240, 255, 0.1)' }} />
               </div>
             )}
 
+            {/* System message */}
             {isSystem ? (
               <div style={{
                 textAlign: 'center',
-                padding: '4px 0',
-                fontSize: '11px',
-                color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)',
+                padding: '6px 0',
+                margin: '4px 0',
               }}>
-                {msg.content}
+                <span style={{
+                  color: 'var(--text-dim)',
+                  fontSize: '12px',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  ▶ {msg.content}
+                </span>
               </div>
             ) : (
+              /* Normal message */
               <div
                 data-msg-id={msg.id}
-                className="fade-in"
                 onMouseEnter={() => setHoveredMsg(msg.id)}
                 onMouseLeave={() => { setHoveredMsg(null); setShowReactionPicker(null); }}
                 style={{
-                  position: 'relative',
                   display: 'flex',
-                  flexDirection: isSelf ? 'row-reverse' : 'row',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                  padding: '4px 8px',
-                  borderRadius: 'var(--radius)',
-                  maxWidth: '75%',
-                  alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                  gap: '10px',
+                  padding: isGrouped ? '2px 8px' : '8px 8px',
+                  borderRadius: 'var(--radius-sm)',
                   background: hoveredMsg === msg.id ? 'var(--msg-bg)' : 'transparent',
                   transition: 'background 0.15s ease',
+                  flexDirection: isSelf ? 'row-reverse' : 'row',
+                  position: 'relative',
                 }}
               >
-                {/* Avatar */}
-                <Avatar uid={msg.sender_uid} nickname={msg.sender_nickname} size={32} />
+                {/* Avatar - only show if not grouped */}
+                {!isGrouped ? (
+                  <Avatar uid={msg.sender_uid} nickname={msg.sender_nickname} size={36} />
+                ) : (
+                  <div style={{ width: '36px', flexShrink: 0 }} />
+                )}
 
-                {/* Message content */}
+                {/* Content */}
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '2px',
-                  minWidth: 0,
+                  maxWidth: '75%',
+                  minWidth: '0',
                 }}>
-                  {/* Header */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: '8px',
-                    flexDirection: isSelf ? 'row-reverse' : 'row',
-                  }}>
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: isSelf ? 'var(--accent-orange)' : 'var(--accent-cyan)',
+                  {/* Name + time - only show if not grouped */}
+                  {!isGrouped && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: '8px',
+                      flexDirection: isSelf ? 'row-reverse' : 'row',
                     }}>
-                      {msg.sender_nickname}
-                    </span>
-                    <span style={{
-                      fontSize: '10px',
-                      color: 'var(--text-secondary)',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
-                      {formatTime(msg.timestamp)}
-                    </span>
-                  </div>
+                      <span style={{
+                        color: isSelf ? 'var(--accent-orange)' : 'var(--accent-cyan)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {msg.sender_nickname}
+                      </span>
+                      <span style={{
+                        color: 'var(--text-dim)',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        flexShrink: 0,
+                      }}>
+                        {formatTime(msg.timestamp)}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Reply reference */}
                   {msg.reply_to && (
                     <div style={{
                       fontSize: '11px',
-                      color: 'var(--text-secondary)',
+                      color: 'var(--text-dim)',
                       padding: '2px 8px',
-                      borderLeft: '2px solid var(--accent-cyan-border)',
-                      background: 'rgba(0, 240, 255, 0.03)',
+                      borderLeft: isSelf ? 'none' : '2px solid var(--accent-cyan-border)',
+                      borderRight: isSelf ? '2px solid var(--accent-orange-border)' : 'none',
+                      marginBottom: '2px',
                     }}>
-                      ↩ Reply to message
+                      ↩ 回复
                     </div>
                   )}
 
-                  {/* Content */}
+                  {/* Message body */}
                   <div style={{
-                    fontSize: '14px',
-                    lineHeight: '1.5',
                     color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    lineHeight: '1.65',
                     wordBreak: 'break-word',
                     whiteSpace: 'pre-wrap',
                   }}>
@@ -215,8 +222,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                     <div style={{
                       display: 'flex',
                       gap: '4px',
-                      flexWrap: 'wrap',
                       marginTop: '4px',
+                      flexWrap: 'wrap',
                     }}>
                       {Array.from(msg.reactions.entries()).map(([emoji, uids]) => (
                         <span
@@ -230,54 +237,39 @@ export const MessageList: React.FC<MessageListProps> = ({
                       ))}
                     </div>
                   )}
-
-                  {/* Read receipt */}
-                  {isSelf && msg.read_by.size > 0 && (
-                    <div className="read-receipt" style={{ alignSelf: 'flex-end' }}>
-                      ✓ Read
-                    </div>
-                  )}
                 </div>
 
-                {/* Action buttons on hover */}
-                {hoveredMsg === msg.id && (
+                {/* Hover actions */}
+                {hoveredMsg === msg.id && !isSystem && (
                   <div style={{
                     position: 'absolute',
                     top: '-4px',
-                    [isSelf ? 'left' : 'right']: '40px',
+                    [isSelf ? 'left' : 'right']: '48px',
                     display: 'flex',
                     gap: '2px',
                     background: 'var(--bg-panel-solid)',
                     border: '1px solid var(--accent-cyan-border)',
-                    borderRadius: 'var(--radius)',
+                    borderRadius: 'var(--radius-sm)',
                     padding: '2px',
                     zIndex: 10,
                   }}>
                     <button
                       onClick={() => onReply(msg.id, msg.sender_nickname)}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        padding: '4px 6px',
-                        fontSize: '12px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px 6px', fontSize: '12px',
                       }}
-                      title="Reply"
+                      title="回复"
                     >
                       ↩
                     </button>
                     <button
                       onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        padding: '4px 6px',
-                        fontSize: '12px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px 6px', fontSize: '12px',
                       }}
-                      title="React"
+                      title="表情"
                     >
                       😊
                     </button>
@@ -288,14 +280,14 @@ export const MessageList: React.FC<MessageListProps> = ({
                 {showReactionPicker === msg.id && (
                   <div style={{
                     position: 'absolute',
-                    top: '-32px',
-                    [isSelf ? 'left' : 'right']: '4px',
+                    top: '-36px',
+                    [isSelf ? 'left' : 'right']: '48px',
                     display: 'flex',
                     gap: '2px',
                     background: 'var(--bg-panel-solid)',
                     border: '1px solid var(--accent-cyan-border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '4px',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '6px',
                     zIndex: 20,
                   }}>
                     {REACTION_EMOJIS.map(emoji => (
@@ -303,12 +295,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                         key={emoji}
                         onClick={() => { onReaction(msg.id, emoji); setShowReactionPicker(null); }}
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '16px',
-                          padding: '2px 4px',
-                          borderRadius: '2px',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          fontSize: '18px', padding: '2px 4px', borderRadius: '2px',
                         }}
                       >
                         {emoji}

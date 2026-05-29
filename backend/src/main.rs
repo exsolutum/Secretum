@@ -25,6 +25,11 @@ use tokio::sync::{mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
+/// Get current timestamp in milliseconds (JavaScript-compatible)
+fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
 /// Application shared state
 #[derive(Clone)]
 pub struct AppState {
@@ -133,7 +138,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             continue;
                         }
                         handle_join(
-                            &client_msg.payload, &state, &tx, &uid, &nickname, &mut room_id,
+                            &client_msg.payload, &state, &tx, &uid, &mut nickname, &mut room_id,
                         ).await;
                     }
                     ClientMessageType::Chat => {
@@ -217,7 +222,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 let payload = serde_json::json!({
                     "uid": uid,
                     "nickname": nickname,
-                    "timestamp": chrono::Utc::now().timestamp(),
+                    "timestamp": now_ms(),
                 }).to_string();
                 broadcast_to_room(&state, &room_id, &ServerMessage::new(ServerMessageType::UserLeft, payload)).await;
 
@@ -267,7 +272,7 @@ async fn handle_auth(
 
     // For now, accept all auth (in production, verify the signature)
     *uid = computed_uid.clone();
-    *nickname = format!("user_{}", &computed_uid[..8]);
+    // Nickname will be set when user joins a room, not here
     *authenticated = true;
 
     let response = serde_json::json!({
@@ -285,7 +290,7 @@ async fn handle_join(
     state: &AppState,
     tx: &mpsc::UnboundedSender<String>,
     uid: &str,
-    _nickname: &str,
+    nickname: &mut String,
     room_id: &mut String,
 ) {
     let join_msg: JoinMessage = match serde_json::from_str(payload) {
@@ -329,11 +334,14 @@ async fn handle_join(
             uid: uid.to_string(),
             nickname: join_msg.nickname.clone(),
             public_key: String::new(),
-            joined_at: chrono::Utc::now().timestamp(),
+            joined_at: now_ms(),
             is_typing: false,
             last_read: 0,
         };
         room.connections.insert(uid.to_string(), conn);
+
+        // Update the user's nickname
+        *nickname = join_msg.nickname.clone();
 
         // Send history
         let history = room.get_history(100);
@@ -366,7 +374,7 @@ async fn handle_join(
         let join_payload = serde_json::json!({
             "uid": uid,
             "nickname": join_msg.nickname,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": now_ms(),
         }).to_string();
         broadcast_to_room_no_lock(state, &join_msg.room_id, &ServerMessage::new(ServerMessageType::UserJoined, join_payload)).await;
 
@@ -384,18 +392,21 @@ async fn handle_join(
             connections: HashMap::new(),
             blacklist: HashSet::new(),
             message_history: Vec::new(),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: now_ms(),
         };
 
         let conn = RoomConnection {
             uid: uid.to_string(),
             nickname: join_msg.nickname.clone(),
             public_key: String::new(),
-            joined_at: chrono::Utc::now().timestamp(),
+            joined_at: now_ms(),
             is_typing: false,
             last_read: 0,
         };
         new_room.connections.insert(uid.to_string(), conn);
+
+        // Update the user's nickname
+        *nickname = join_msg.nickname.clone();
 
         // Send room info
         let room_info = RoomInfo {
@@ -485,7 +496,7 @@ async fn handle_chat(
     broadcast_to_room(state, room_id, &ServerMessage {
         msg_type: ServerMessageType::Chat,
         payload: json,
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp: now_ms(),
         message_id: Some(msg_id),
     }).await;
 }
@@ -543,7 +554,7 @@ async fn handle_read(
     let broadcast_payload = serde_json::json!({
         "uid": uid,
         "message_id": receipt.message_id,
-        "timestamp": chrono::Utc::now().timestamp(),
+        "timestamp": now_ms(),
     }).to_string();
 
     broadcast_to_room(state, room_id, &ServerMessage::new(ServerMessageType::Read, broadcast_payload)).await;
@@ -602,7 +613,7 @@ async fn handle_file(
         sender_nickname: nickname.to_string(),
         encrypted_content: file.encrypted_data.clone(),
         iv: file.iv.clone(),
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp: now_ms(),
         message_type: ChatMessageType::File,
         reply_to: None,
         mentions: Vec::new(),
@@ -631,7 +642,7 @@ async fn handle_file(
     broadcast_to_room(state, room_id, &ServerMessage {
         msg_type: ServerMessageType::File,
         payload: json,
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp: now_ms(),
         message_id: Some(msg_id),
     }).await;
 }
@@ -731,7 +742,7 @@ async fn handle_leave(
         let payload = serde_json::json!({
             "uid": uid,
             "nickname": nickname,
-            "timestamp": chrono::Utc::now().timestamp(),
+            "timestamp": now_ms(),
         }).to_string();
 
         broadcast_to_room_with_conns(state, room_id, &ServerMessage::new(ServerMessageType::UserLeft, payload)).await;

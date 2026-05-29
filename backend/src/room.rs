@@ -79,7 +79,7 @@ impl Room {
             connections: HashMap::new(),
             blacklist: HashSet::new(),
             message_history: Vec::new(),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: chrono::Utc::now().timestamp_millis(),
         }
     }
 

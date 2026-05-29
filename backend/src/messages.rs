@@ -247,7 +247,7 @@ impl ServerMessage {
         Self {
             msg_type,
             payload,
-            timestamp: chrono::Utc::now().timestamp(),
+            timestamp: chrono::Utc::now().timestamp_millis(),
             message_id: None,
         }
     }

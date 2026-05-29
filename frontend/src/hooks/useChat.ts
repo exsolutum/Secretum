@@ -8,12 +8,8 @@ import {
   RoomUser,
   ChatMessageType,
 } from '../types/messages';
-import { initWasm, getWasm, WasmCrypto } from './useWasm';
-
-// Safe wasm helper - returns null if wasm not loaded
-function safeWasm(): WasmCrypto | null {
-  try { return getWasm(); } catch { return null; }
-}
+import { initWasm, safeWasm } from './useCrypto';
+import { encryptMessage, decryptMessage } from './useCrypto';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
@@ -71,34 +67,6 @@ export function useChat(): UseChatReturn {
     initWasm().catch(console.error);
   }, []);
 
-  // Play notification sound
-  const playNotificationSound = useCallback(() => {
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.type = 'sine';
-      gain.gain.value = 0.1;
-      osc.start();
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      osc.stop(ctx.currentTime + 0.15);
-    } catch {
-      // Audio not available
-    }
-  }, []);
-
-  // Send queued messages
-  const flushMessageQueue = useCallback(() => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    while (messageQueueRef.current.length > 0) {
-      const msg = messageQueueRef.current.shift();
-      if (msg) wsRef.current.send(msg);
-    }
-  }, []);
-
   // Send message helper
   const send = useCallback((msgType: ClientMessageType, payload: unknown) => {
     const msg: ClientMessage = {
@@ -112,6 +80,24 @@ export function useChat(): UseChatReturn {
       wsRef.current.send(json);
     } else {
       messageQueueRef.current.push(json);
+    }
+  }, []);
+
+  // Flush queued messages
+  const flushMessageQueue = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    while (messageQueueRef.current.length > 0) {
+      const msg = messageQueueRef.current.shift();
+      if (msg) wsRef.current.send(msg);
+    }
+  }, []);
+
+  // Decrypt a message payload (async, supports Web Crypto fallback)
+  const decryptPayload = useCallback(async (encrypted: string, iv: string): Promise<string> => {
+    try {
+      return await decryptMessage(encrypted, iv, roomSecretRef.current, roomIdRef.current);
+    } catch {
+      return '[Encrypted message]';
     }
   }, []);
 
@@ -179,49 +165,36 @@ export function useChat(): UseChatReturn {
               joined_at: u.joined_at || Date.now(),
             })));
           }
-        } catch { /* ignore parse errors */ }
+        } catch { /* ignore */ }
         break;
       }
       case 'Chat': {
         try {
           const data = JSON.parse(msg.payload);
-          const wasm = safeWasm();
-          let content = data.encrypted_content || '';
-          try {
-            if (wasm) {
-              const key = wasm.derive_key(roomSecretRef.current, roomIdRef.current, 100000);
-              content = wasm.sm4_decrypt(key, data.encrypted_content, data.iv);
-              content = wasm.hex_to_text(content);
+          // Decrypt async
+          decryptPayload(data.encrypted_content || '', data.iv || '').then(content => {
+            const displayMsg: DisplayMessage = {
+              id: data.message_id || Date.now().toString(),
+              sender_uid: data.sender_uid || '',
+              sender_nickname: data.sender_nickname || 'Unknown',
+              content,
+              timestamp: data.timestamp || Date.now(),
+              message_type: data.message_type || 'Text',
+              reply_to: data.reply_to || null,
+              mentions: data.mentions || [],
+              reactions: new Map(Object.entries(data.reactions || {})),
+              read_by: new Set(data.read_by || []),
+              is_self: (data.sender_uid || '') === myUid,
+            };
+            setMessages(prev => {
+              const next = [...prev, displayMsg];
+              return next.length > MAX_MESSAGE_HISTORY ? next.slice(-MAX_MESSAGE_HISTORY) : next;
+            });
+            if (!displayMsg.is_self && !document.hasFocus()) {
+              setUnreadCount(prev => prev + 1);
             }
-          } catch {
-            content = '[Encrypted message]';
-          }
-
-          const displayMsg: DisplayMessage = {
-            id: data.message_id || Date.now().toString(),
-            sender_uid: data.sender_uid || '',
-            sender_nickname: data.sender_nickname || 'Unknown',
-            content,
-            timestamp: data.timestamp || Date.now(),
-            message_type: data.message_type || 'Text',
-            reply_to: data.reply_to || null,
-            mentions: data.mentions || [],
-            reactions: new Map(Object.entries(data.reactions || {})),
-            read_by: new Set(data.read_by || []),
-            is_self: (data.sender_uid || '') === myUid,
-          };
-
-          setMessages(prev => {
-            const next = [...prev, displayMsg];
-            return next.length > MAX_MESSAGE_HISTORY ? next.slice(-MAX_MESSAGE_HISTORY) : next;
           });
-
-          // Increment unread if not from self and window not focused
-          if (!displayMsg.is_self && !document.hasFocus()) {
-            setUnreadCount(prev => prev + 1);
-            playNotificationSound();
-          }
-        } catch { /* ignore parse errors */ }
+        } catch { /* ignore */ }
         break;
       }
       case 'System': {
@@ -230,7 +203,7 @@ export function useChat(): UseChatReturn {
           sender_uid: 'system',
           sender_nickname: 'System',
           content: msg.payload,
-          timestamp: msg.timestamp,
+          timestamp: msg.timestamp || Date.now(),
           message_type: 'System',
           reply_to: null,
           mentions: [],
@@ -249,7 +222,6 @@ export function useChat(): UseChatReturn {
             next.set(data.uid, data.is_typing);
             return next;
           });
-          // Clear typing after timeout
           if (data.is_typing) {
             const existing = typingTimeoutRef.current.get(data.uid);
             if (existing) clearTimeout(existing);
@@ -322,18 +294,12 @@ export function useChat(): UseChatReturn {
         try {
           const data = JSON.parse(msg.payload);
           if (Array.isArray(data.messages)) {
-            const wasm = safeWasm();
-            const historyMsgs: DisplayMessage[] = data.messages.map((m: any) => {
-              let content = m.encrypted_content || '';
+            // Decrypt all messages in parallel
+            const decryptPromises = data.messages.map(async (m: any) => {
+              let content = '[Encrypted message]';
               try {
-                if (wasm) {
-                  const key = wasm.derive_key(roomSecretRef.current, roomIdRef.current, 100000);
-                  content = wasm.sm4_decrypt(key, m.encrypted_content, m.iv);
-                  content = wasm.hex_to_text(content);
-                }
-              } catch {
-                content = '[Encrypted message]';
-              }
+                content = await decryptPayload(m.encrypted_content || '', m.iv || '');
+              } catch { /* keep default */ }
               return {
                 id: m.message_id || Date.now().toString(),
                 sender_uid: m.sender_uid || '',
@@ -346,9 +312,11 @@ export function useChat(): UseChatReturn {
                 reactions: new Map(Object.entries(m.reactions || {})),
                 read_by: new Set(m.read_by || []),
                 is_self: (m.sender_uid || '') === myUid,
-              };
+              } as DisplayMessage;
             });
-            setMessages(prev => [...historyMsgs, ...prev].slice(-MAX_MESSAGE_HISTORY));
+            Promise.all(decryptPromises).then(historyMsgs => {
+              setMessages(prev => [...historyMsgs, ...prev].slice(-MAX_MESSAGE_HISTORY));
+            });
           }
         } catch { /* ignore */ }
         break;
@@ -357,18 +325,11 @@ export function useChat(): UseChatReturn {
         try {
           const data = JSON.parse(msg.payload);
           if (Array.isArray(data.messages)) {
-            const wasm = safeWasm();
-            const results: DisplayMessage[] = data.messages.map((m: any) => {
-              let content = m.encrypted_content || '';
+            const decryptPromises = data.messages.map(async (m: any) => {
+              let content = '[Encrypted message]';
               try {
-                if (wasm) {
-                  const key = wasm.derive_key(roomSecretRef.current, roomIdRef.current, 100000);
-                  content = wasm.sm4_decrypt(key, m.encrypted_content, m.iv);
-                  content = wasm.hex_to_text(content);
-                }
-              } catch {
-                content = '[Encrypted message]';
-              }
+                content = await decryptPayload(m.encrypted_content || '', m.iv || '');
+              } catch { /* keep default */ }
               return {
                 id: m.message_id || Date.now().toString(),
                 sender_uid: m.sender_uid || '',
@@ -381,9 +342,11 @@ export function useChat(): UseChatReturn {
                 reactions: new Map(Object.entries(m.reactions || {})),
                 read_by: new Set(m.read_by || []),
                 is_self: (m.sender_uid || '') === myUid,
-              };
+              } as DisplayMessage;
             });
-            setSearchResults(results);
+            Promise.all(decryptPromises).then(results => {
+              setSearchResults(results);
+            });
           }
         } catch { /* ignore */ }
         break;
@@ -422,7 +385,7 @@ export function useChat(): UseChatReturn {
             id: data.message?.message_id || Date.now().toString(),
             sender_uid: data.message?.sender_uid || '',
             sender_nickname: data.message?.sender_nickname || 'Unknown',
-            content: `📎 File: ${data.file?.filename || 'unknown'} (${formatFileSize(data.file?.size || 0)})`,
+            content: `📎 ${data.file?.filename || 'unknown'} (${formatFileSize(data.file?.size || 0)})`,
             timestamp: data.message?.timestamp || Date.now(),
             message_type: 'File',
             reply_to: null,
@@ -435,7 +398,6 @@ export function useChat(): UseChatReturn {
           setMessages(prev => [...prev, fileMsg]);
           if (!fileMsg.is_self && !document.hasFocus()) {
             setUnreadCount(prev => prev + 1);
-            playNotificationSound();
           }
         } catch { /* ignore */ }
         break;
@@ -445,7 +407,7 @@ export function useChat(): UseChatReturn {
         break;
       }
     }
-  }, [myUid, send, playNotificationSound]);
+  }, [myUid, send, decryptPayload]);
 
   // Connect to WebSocket
   const connect = useCallback((nickname: string, roomId: string, roomSecret: string) => {
@@ -470,8 +432,15 @@ export function useChat(): UseChatReturn {
       // Generate keypair and authenticate
       const wasm = safeWasm();
       if (!wasm) {
-        setError('Crypto module not loaded');
-        setConnectionState('error');
+        // Even without WASM, we can still connect (use Web Crypto for encryption)
+        // Send a simple auth with random public key
+        const fakePk = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        send('Auth', {
+          public_key: fakePk,
+          timestamp: Date.now(),
+          signature: 'no-wasm-' + Date.now(),
+        });
         return;
       }
       const keypair = wasm.generate_keypair();
@@ -498,7 +467,6 @@ export function useChat(): UseChatReturn {
 
     ws.onclose = () => {
       setConnectionState('disconnected');
-      // Auto-reconnect
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         setConnectionState('reconnecting');
         const delay = RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current);
@@ -515,77 +483,47 @@ export function useChat(): UseChatReturn {
     };
   }, [send, handleServerMessage]);
 
-  // Send a chat message
-  const sendMessage = useCallback((content: string, replyTo?: string) => {
-    const wasm = safeWasm();
-    if (!wasm) return;
-    const iv = wasm.random_bytes(16);
-    const key = wasm.derive_key(roomSecretRef.current, roomIdRef.current, 100000);
-    const contentHex = wasm.text_to_hex(content);
-    const encrypted = wasm.sm4_encrypt(key, contentHex, iv);
-
-    send('Chat', {
-      room_id: roomIdRef.current,
-      encrypted_content: encrypted,
-      iv,
-      timestamp: Date.now(),
-      message_type: 'Text',
-      reply_to: replyTo || null,
-      mentions: [],
-    });
-  }, [send]);
-
-  // Send typing indicator
-  const sendTyping = useCallback((isTyping: boolean) => {
-    send('Typing', {
-      room_id: roomIdRef.current,
-      is_typing: isTyping,
-    });
-  }, [send]);
-
-  // Send read receipt
-  const sendReadReceipt = useCallback((messageId: string) => {
-    send('Read', {
-      room_id: roomIdRef.current,
-      message_id: messageId,
-      timestamp: Date.now(),
-    });
-  }, [send]);
-
-  // Send reaction
-  const sendReaction = useCallback((messageId: string, emoji: string, remove = false) => {
-    send('Reaction', {
-      room_id: roomIdRef.current,
-      message_id: messageId,
-      emoji,
-      remove,
-    });
-  }, [send]);
-
-  // Execute admin command
-  const executeAdminCommand = useCallback((command: string, targetUid?: string, reason?: string) => {
-    send('Admin', {
-      command,
-      target_uid: targetUid || null,
-      reason: reason || null,
-    });
-  }, [send]);
-
-  // Search messages
-  const searchMessages = useCallback((query: string) => {
-    send('Search', {
-      room_id: roomIdRef.current,
-      query,
-      limit: 50,
-    });
-  }, [send]);
-
-  // Disconnect
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
+  // Send a chat message (async encryption)
+  const sendMessage = useCallback(async (content: string, replyTo?: string) => {
+    try {
+      const { encrypted, iv } = await encryptMessage(content, roomSecretRef.current, roomIdRef.current);
+      send('Chat', {
+        room_id: roomIdRef.current,
+        encrypted_content: encrypted,
+        iv,
+        timestamp: Date.now(),
+        message_type: 'Text',
+        reply_to: replyTo || null,
+        mentions: [],
+      });
+    } catch (e) {
+      console.error('Encryption failed:', e);
     }
-    reconnectAttemptsRef.current = MAX_RECONNECT_ATTEMPTS; // Prevent auto-reconnect
+  }, [send]);
+
+  const sendTyping = useCallback((isTyping: boolean) => {
+    send('Typing', { room_id: roomIdRef.current, is_typing: isTyping });
+  }, [send]);
+
+  const sendReadReceipt = useCallback((messageId: string) => {
+    send('Read', { room_id: roomIdRef.current, message_id: messageId, timestamp: Date.now() });
+  }, [send]);
+
+  const sendReaction = useCallback((messageId: string, emoji: string, remove = false) => {
+    send('Reaction', { room_id: roomIdRef.current, message_id: messageId, emoji, remove });
+  }, [send]);
+
+  const executeAdminCommand = useCallback((command: string, targetUid?: string, reason?: string) => {
+    send('Admin', { command, target_uid: targetUid || null, reason: reason || null });
+  }, [send]);
+
+  const searchMessages = useCallback((query: string) => {
+    send('Search', { room_id: roomIdRef.current, query, limit: 50 });
+  }, [send]);
+
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+    reconnectAttemptsRef.current = MAX_RECONNECT_ATTEMPTS;
     if (wsRef.current) {
       send('Leave', { room_id: roomIdRef.current });
       wsRef.current.close();
@@ -598,54 +536,25 @@ export function useChat(): UseChatReturn {
     setIsAdmin(false);
   }, [send]);
 
-  // Clear unread count
-  const clearUnread = useCallback(() => {
-    setUnreadCount(0);
-  }, []);
+  const clearUnread = useCallback(() => { setUnreadCount(0); }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      if (wsRef.current) wsRef.current.close();
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       typingTimeoutRef.current.forEach(t => clearTimeout(t));
     };
   }, []);
 
-  // Update document title with unread count
   useEffect(() => {
-    if (unreadCount > 0) {
-      document.title = `(${unreadCount}) SECRETUM`;
-    } else {
-      document.title = 'SECRETUM';
-    }
+    document.title = unreadCount > 0 ? `(${unreadCount}) SECRETUM` : 'SECRETUM';
   }, [unreadCount]);
 
   return {
-    connectionState,
-    messages,
-    users,
-    typingUsers,
-    roomInfo,
-    isAdmin,
-    myUid,
-    myNickname,
-    error,
-    connect,
-    sendMessage,
-    sendTyping,
-    sendReadReceipt,
-    sendReaction,
-    executeAdminCommand,
-    searchMessages,
-    searchResults,
-    disconnect,
-    unreadCount,
-    clearUnread,
+    connectionState, messages, users, typingUsers, roomInfo, isAdmin,
+    myUid, myNickname, error, connect, sendMessage, sendTyping,
+    sendReadReceipt, sendReaction, executeAdminCommand, searchMessages,
+    searchResults, disconnect, unreadCount, clearUnread,
   };
 }
 
