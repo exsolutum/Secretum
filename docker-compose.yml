@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  secretum:
+    build: .
+    container_name: secretum
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./secretum.toml:/app/secretum.toml
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info

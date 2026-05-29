@@ -16,7 +16,7 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use messages::*;
-use room::{hash_room_secret, verify_room_secret, Room, RoomConnection, SharedRooms, StoredMessage};
+use room::{hash_room_secret, Room, RoomConnection, SharedRooms, StoredMessage};
 use auth::{AuthState, SharedAuthState, UserIdentity};
 use config::Config;
 use std::collections::{HashMap, HashSet};
@@ -285,7 +285,7 @@ async fn handle_join(
     state: &AppState,
     tx: &mpsc::UnboundedSender<String>,
     uid: &str,
-    nickname: &str,
+    _nickname: &str,
     room_id: &mut String,
 ) {
     let join_msg: JoinMessage = match serde_json::from_str(payload) {
