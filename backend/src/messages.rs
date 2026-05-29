@@ -93,6 +93,7 @@ pub struct AdminCommand {
 pub enum AdminCommandType {
     Kick,
     Ban,
+    Unban,
     LockRoom,
     UnlockRoom,
     DestroyRoom,

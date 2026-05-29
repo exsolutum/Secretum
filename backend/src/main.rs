@@ -224,6 +224,12 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 // System message
                 let sys_msg = ServerMessage::system(&format!("{} left the room", nickname));
                 broadcast_to_room(&state, &room_id, &sys_msg).await;
+
+                // Auto-destroy empty rooms
+                if room.connections.is_empty() {
+                    tracing::info!("Room {} is empty, auto-destroying", room_id);
+                    rooms.remove(&room_id);
+                }
             }
         }
     }
@@ -672,6 +678,13 @@ async fn handle_admin(
                         let _ = handle.tx.send(ServerMessage::new(ServerMessageType::Banned, "You have been banned".to_string()).to_json());
                     }
                     let sys_msg = ServerMessage::system(&format!("User {} has been banned", target_uid));
+                    broadcast_to_room_with_conns(&state, room_id, &sys_msg).await;
+                }
+            }
+            AdminCommandType::Unban => {
+                if let Some(target_uid) = &cmd.target_uid {
+                    room.blacklist.remove(target_uid);
+                    let sys_msg = ServerMessage::system(&format!("User {} has been unbanned", target_uid));
                     broadcast_to_room_with_conns(&state, room_id, &sys_msg).await;
                 }
             }

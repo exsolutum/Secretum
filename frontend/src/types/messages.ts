@@ -50,7 +50,7 @@ export interface AdminCommand {
   reason: string | null;
 }
 
-export type AdminCommandType = 'Kick' | 'Ban' | 'LockRoom' | 'UnlockRoom' | 'DestroyRoom' | 'TransferAdmin';
+export type AdminCommandType = 'Kick' | 'Ban' | 'Unban' | 'LockRoom' | 'UnlockRoom' | 'DestroyRoom' | 'TransferAdmin';
 
 export interface RoomUser {
   uid: string;
