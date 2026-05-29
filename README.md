@@ -71,6 +71,25 @@ docker run -p 3000:3000 -v ./secretum.toml:/app/secretum.toml secretum
 
 ### Termux (Android)
 
+**方式一：直接下载预编译二进制（推荐）**
+
+```bash
+# 下载 aarch64 静态链接二进制（适用于绝大多数 Android 设备）
+wget https://github.com/exsolutum/Secretum/releases/download/v1.0.0/secretum-v1.0.0-aarch64-linux-musl
+
+# 赋予执行权限
+chmod +x secretum-v1.0.0-aarch64-linux-musl
+
+# 直接运行（无需安装任何依赖！）
+./secretum-v1.0.0-aarch64-linux-musl
+
+# 在手机浏览器打开 http://127.0.0.1:3000
+```
+
+> 该二进制为 **静态链接** (musl libc)，不依赖 Android 系统库，可直接在 Termux 中运行。
+
+**方式二：从源码编译**
+
 ```bash
 # Install dependencies
 pkg install rust nodejs
