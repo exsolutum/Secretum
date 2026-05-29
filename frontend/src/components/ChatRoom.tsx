@@ -44,6 +44,15 @@ export const ChatRoom: React.FC = () => {
     }
   }, [chat.connectionState]);
 
+  // Clear unread count when window gains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      chat.clearUnread();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [chat]);
+
   const handleReply = useCallback((messageId: string, nickname: string) => {
     setReplyTo({ messageId, nickname });
   }, []);
