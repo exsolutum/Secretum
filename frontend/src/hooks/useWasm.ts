@@ -67,7 +67,7 @@ async function webCryptoSha256(data: string): Promise<string> {
 }
 
 // JavaScript fallback when WASM is not available
-function createJsFallback(): WasmCrypto {
+export function createJsFallback(): WasmCrypto {
   // Simple hash function for UID computation (synchronous fallback)
   function simpleHash(data: string): string {
     let hash = 0;

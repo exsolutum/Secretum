@@ -3,7 +3,7 @@ use ts_rs::TS;
 
 /// Authentication message - must be the first message after WebSocket connection
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct AuthMessage {
     pub public_key: String,
     pub timestamp: i64,
@@ -12,7 +12,7 @@ pub struct AuthMessage {
 
 /// Join room request
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct JoinMessage {
     pub room_id: String,
     pub room_secret: String,
@@ -21,7 +21,7 @@ pub struct JoinMessage {
 
 /// Chat message (encrypted)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct ChatMessage {
     pub room_id: String,
     pub encrypted_content: String,
@@ -34,7 +34,7 @@ pub struct ChatMessage {
 
 /// Type of chat message
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub enum ChatMessageType {
     Text,
     Image,
@@ -45,7 +45,7 @@ pub enum ChatMessageType {
 
 /// Typing indicator
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct TypingIndicator {
     pub room_id: String,
     pub is_typing: bool,
@@ -53,7 +53,7 @@ pub struct TypingIndicator {
 
 /// Read receipt
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct ReadReceipt {
     pub room_id: String,
     pub message_id: String,
@@ -62,7 +62,7 @@ pub struct ReadReceipt {
 
 /// User presence status
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub enum UserStatus {
     Online,
     Away,
@@ -71,7 +71,7 @@ pub enum UserStatus {
 
 /// Presence update notification
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct PresenceUpdate {
     pub uid: String,
     pub nickname: String,
@@ -80,7 +80,7 @@ pub struct PresenceUpdate {
 
 /// Admin command
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct AdminCommand {
     pub command: AdminCommandType,
     pub target_uid: Option<String>,
@@ -89,7 +89,7 @@ pub struct AdminCommand {
 
 /// Admin command types
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub enum AdminCommandType {
     Kick,
     Ban,
@@ -102,7 +102,7 @@ pub enum AdminCommandType {
 
 /// User info in room
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct RoomUser {
     pub uid: String,
     pub nickname: String,
@@ -113,7 +113,7 @@ pub struct RoomUser {
 
 /// Room info
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct RoomInfo {
     pub room_id: String,
     pub is_locked: bool,
@@ -123,7 +123,7 @@ pub struct RoomInfo {
 
 /// Search request
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct SearchRequest {
     pub room_id: String,
     pub query: String,
@@ -132,7 +132,7 @@ pub struct SearchRequest {
 
 /// Search result
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct SearchResult {
     pub messages: Vec<StoredMessagePayload>,
     pub total: usize,
@@ -140,7 +140,7 @@ pub struct SearchResult {
 
 /// File upload metadata
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct FileMetadata {
     pub filename: String,
     pub mime_type: String,
@@ -151,7 +151,7 @@ pub struct FileMetadata {
 
 /// Reaction message
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct ReactionMessage {
     pub room_id: String,
     pub message_id: String,
@@ -161,7 +161,7 @@ pub struct ReactionMessage {
 
 /// Stored message payload (for history and search results)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct StoredMessagePayload {
     pub message_id: String,
     pub sender_uid: String,
@@ -178,7 +178,7 @@ pub struct StoredMessagePayload {
 
 /// Client -> Server message type
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub enum ClientMessageType {
     Auth,
     Join,
@@ -196,7 +196,7 @@ pub enum ClientMessageType {
 
 /// Client -> Server message wrapper
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct ClientMessage {
     pub msg_type: ClientMessageType,
     pub payload: String,
@@ -206,7 +206,7 @@ pub struct ClientMessage {
 
 /// Server -> Client message type
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub enum ServerMessageType {
     AuthOk,
     AuthError,
@@ -234,7 +234,7 @@ pub enum ServerMessageType {
 
 /// Server -> Client message wrapper
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "../frontend/src/types/")]
+#[ts(export_to = "../../frontend/src/types/")]
 pub struct ServerMessage {
     pub msg_type: ServerMessageType,
     pub payload: String,
