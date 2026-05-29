@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DisplayMessage } from '../types/messages';
+import { Avatar } from './Avatar';
+import { playMessageSound, isSoundEnabled } from '../hooks/useSounds';
 
 interface MessageListProps {
   messages: DisplayMessage[];
@@ -38,10 +40,15 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const prevMsgCountRef = useRef(0);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages + play sound
   useEffect(() => {
     if (listRef.current && messages.length > prevMsgCountRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
+      // Play sound for new messages from others
+      const latestMsg = messages[messages.length - 1];
+      if (latestMsg && !latestMsg.is_self && isSoundEnabled()) {
+        playMessageSound();
+      }
     }
     prevMsgCountRef.current = messages.length;
   }, [messages.length]);
@@ -147,22 +154,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 }}
               >
                 {/* Avatar */}
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '2px',
-                  background: isSelf ? 'var(--accent-orange-dim)' : 'var(--accent-cyan-dim)',
-                  border: `1px solid ${isSelf ? 'var(--accent-orange-border)' : 'var(--accent-cyan-border)'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontFamily: 'var(--font-mono)',
-                  color: isSelf ? 'var(--accent-orange)' : 'var(--accent-cyan)',
-                  flexShrink: 0,
-                }}>
-                  {msg.sender_nickname.charAt(0).toUpperCase()}
-                </div>
+                <Avatar uid={msg.sender_uid} nickname={msg.sender_nickname} size={32} />
 
                 {/* Message content */}
                 <div style={{

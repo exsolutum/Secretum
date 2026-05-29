@@ -231,3 +231,67 @@ body {
 .fade-in { animation: fadeIn 0.2s ease; }
 
 ::selection { background: rgba(0, 240, 255, 0.3); color: var(--text-primary); }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  :root {
+    --radius: 2px;
+  }
+
+  .panel {
+    padding: 12px !important;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+
+  .input {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 8px !important;
+    border-width: 1px !important;
+  }
+
+  .btn {
+    padding: 4px 8px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .btn-sm {
+    padding: 3px 6px;
+    font-size: 8px;
+  }
+}
+
+/* Scrollbar styling for mobile */
+@media (hover: none) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 240, 255, 0.2);
+    border-radius: 2px;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
