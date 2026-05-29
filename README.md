@@ -1,2 +1,150 @@
-# Secretum
-这是一个秘密👿
+# SECRETUM
+
+**Self-hosted, end-to-end encrypted, IPv6-ready private chat room.**
+
+> 这是一个秘密 👿
+
+---
+
+## Features
+
+- **End-to-end encryption** — SM4 (GB/T 32907-2016) + Ed25519, WASM-accelerated
+- **Zero knowledge** — Server never sees plaintext; all crypto runs in the browser
+- **Self-hosted** — Single binary, zero external dependencies
+- **Room-based** — Create or join rooms with a shared secret
+- **Admin controls** — Kick, ban, lock/unlock, destroy, transfer admin
+- **Mainstream chat features**:
+  - Typing indicators
+  - Read receipts
+  - Message replies (threaded)
+  - Emoji reactions
+  - File sharing (encrypted)
+  - Message search
+  - Online presence
+  - Keyboard shortcuts (Ctrl+K search, Esc dismiss)
+  - Drag & drop file upload
+  - Notification system
+- **Holographic glass UI** — Precision instrument aesthetic, no Material Design
+- **Anti-replay** — Ed25519 signature cache prevents message replay attacks
+- **Configurable** — Single `secretum.toml`, auto-creates from embedded defaults
+- **Embedded frontend** — React + Vite + WASM compiled into the binary
+
+## Quick Start
+
+### Build from Source
+
+```bash
+# Prerequisites
+cargo install wasm-pack
+
+# Clone
+git clone https://github.com/exsolutum/Secretum.git
+cd Secretum
+
+# Build WASM crypto core
+wasm-pack build wasm --target web --out-dir pkg
+
+# Build frontend
+cd frontend && npm install && npm run build && cd ..
+
+# Build backend (includes embedded frontend)
+cargo build --release
+
+# Run
+./target/release/secretum
+```
+
+### Docker (planned)
+
+```bash
+docker run -p 3000:3000 -v ./secretum.toml:/app/secretum.toml secretum
+```
+
+## Configuration
+
+On first run, `secretum.toml` is auto-generated with defaults:
+
+```toml
+bind_address = "127.0.0.1"
+port = 3000
+static_files_embedded = true
+persistence_enabled = false
+db_path = "secretum.db"
+db_encryption_key = ""
+log_level = "info"
+max_connections = 100
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│                  Browser                     │
+│  ┌─────────┐  ┌──────────────────────────┐  │
+│  │  React   │  │   WASM Crypto Core       │  │
+│  │  + Vite  │  │   SM4 + Ed25519 + PBKDF2 │  │
+│  └────┬─────┘  └────────────┬─────────────┘  │
+│       └──────────┬──────────┘                 │
+│            WebSocket (encrypted)               │
+└──────────────────┬────────────────────────────┘
+                   │
+┌──────────────────┴────────────────────────────┐
+│              Rust + Axum Server                │
+│  ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
+│  │  Auth    │ │  Rooms   │ │  Persistence  │  │
+│  │  Ed25519 │ │  Argon2  │ │  (optional)   │  │
+│  └──────────┘ └──────────┘ └───────────────┘  │
+└───────────────────────────────────────────────┘
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Rust + Axum 0.7 |
+| Crypto (WASM) | SM4 + Ed25519 + PBKDF2 + Argon2id |
+| Frontend | React 18 + TypeScript + Vite |
+| Type Bridge | ts-rs (Rust → TypeScript auto-generation) |
+| Persistence | Encrypted SQLite (optional, feature flag) |
+| Config | TOML with embedded defaults |
+| Deployment | Single binary with rust-embed |
+
+## Security Model
+
+1. **Key Generation**: Ed25519 keypair generated in-browser via WASM
+2. **Room Secret**: Argon2id-hashed on server, never stored plaintext
+3. **Message Encryption**: SM4-128-CBC with per-message random IV
+4. **Key Derivation**: PBKDF2-SHA256 derives SM4 key from room secret
+5. **Anti-Replay**: Ed25519 signature cache prevents replay attacks
+6. **Zero Knowledge**: Server only sees encrypted blobs; plaintext never leaves the browser
+
+## Project Structure
+
+```
+Secretum/
+├── backend/           # Rust + Axum server
+│   ├── src/
+│   │   ├── main.rs    # WebSocket handler, routing
+│   │   ├── auth.rs    # Ed25519 identity, anti-replay
+│   │   ├── config.rs  # TOML config loader
+│   │   ├── messages.rs# Message types (ts-rs exported)
+│   │   ├── room.rs    # Room management, Argon2
+│   │   ├── persistence.rs # SQLite (optional)
+│   │   └── static_files.rs # rust-embed handler
+│   └── tests/
+├── wasm/              # WASM crypto core
+│   └── src/
+│       └── lib.rs     # SM4, Ed25519, PBKDF2, SHA-256
+├── frontend/          # React + Vite
+│   └── src/
+│       ├── components/ # UI components
+│       ├── hooks/      # useChat, useWasm
+│       ├── types/      # TypeScript types
+│       └── styles/     # Holographic glass CSS
+├── config/            # Example configuration
+└── Cargo.toml         # Workspace root
+```
+
+## License
+
+AGPL-3.0

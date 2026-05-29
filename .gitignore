@@ -1,0 +1,28 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# WASM
+wasm/pkg/
+wasm/target/
+
+# Config (contains secrets)
+secretum.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Database
+*.db
